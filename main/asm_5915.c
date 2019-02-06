@@ -96,6 +96,7 @@ esp_err_t I2C_Readbuff( unsigned char I2C_Addr,unsigned char *buf)
 **         
 **³ö¿Ú²ÎÊý: ³É¹¦·µ»Ø0
 ************************************************************************************/
+extern     char str_asm[80];
 float I2C_AMS5915_Read(void)
 {
 	static short count=0;
@@ -109,6 +110,8 @@ float I2C_AMS5915_Read(void)
 	{count=0;}
 	ams5915_p=((press-1638)/((14745-1638)/5));//*0.04+ams5915_p*0.96;
     // ESP_LOGI(TAG, "ams5915_p is %d\n",(int )(ams5915_p*100));
+    sprintf(str_asm, "ams5915_p = %d\r\nams5915_t = %d \r\n", (int )(ams5915_p*100),(int )(ams5915_t*100));
+   
 	return ams5915_p;
 	
 }

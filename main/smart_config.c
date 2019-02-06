@@ -18,16 +18,17 @@
 #define ADDR_SC 252 //the 250 sector
 
 /* FreeRTOS event group to signal when we are connected & ready to make a request */
-static EventGroupHandle_t wifi_event_group;
+EventGroupHandle_t wifi_event_group;
 
 /* The event group allows multiple bits for each event,
    but we only care about one event - are we connected
    to the AP with an IP? */
 
 
-static const int CONNECTED_BIT = BIT0;
-static const int ESPTOUCH_DONE_BIT = BIT1;
-static const char *TAG = "sc";
+const int CONNECTED_BIT = BIT0;
+const int CONNECTING_BIT = BIT2;
+const int ESPTOUCH_DONE_BIT = BIT1;
+static const char *TAG = "smart config";
 wifi_config_t my_config;
 void smartconfig_task(void *pvParameters);
 void smartconfig_example_task(void * parm);
@@ -40,9 +41,11 @@ static esp_err_t event_handler(void *ctx, system_event_t *event)
         break;
     case SYSTEM_EVENT_STA_GOT_IP:
         xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
+        xEventGroupSetBits(wifi_event_group, CONNECTING_BIT);
         break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
         esp_wifi_connect();
+        xEventGroupClearBits(wifi_event_group, CONNECTING_BIT);
         xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
         break;
     default:
@@ -130,10 +133,10 @@ void smartconfig_task(void *pvParameters)
 	{
 		sc_count=0;
 		spi_flash_read(ADDR_SC*4096,(uint32_t *)&sc_count,sizeof(sc_count));
-		printf("smartconfig_onoff sc_count=%u\r\n",sc_count);	
+		ESP_LOGI(TAG,"smartconfig_onoff sc_count=%u\r\n",sc_count);	
 		if(sc_count>3)
 		{
-			printf("smartconfig_start sc_count=%u\r\n",sc_count);	
+			ESP_LOGI(TAG,"smartconfig_start sc_count=%u\r\n",sc_count);	
 			sc_count=0;
 			spi_flash_erase_sector(ADDR_SC);
 			spi_flash_write(ADDR_SC*4096,(uint32_t *)&sc_count,sizeof(sc_count));
@@ -142,7 +145,7 @@ void smartconfig_task(void *pvParameters)
 		}
 		else
 		{
-			printf("connecting......");	
+			ESP_LOGI(TAG,"connecting......\r\n");	
 			
 			sc_count=sc_count+1;
 			spi_flash_erase_sector(ADDR_SC);
@@ -159,7 +162,7 @@ void smartconfig_task(void *pvParameters)
 	}
 	else
 	{	
-		printf("smartconfig_start_button");	
+		ESP_LOGI(TAG,"smartconfig_start_button\r\n");	
         ESP_ERROR_CHECK( esp_smartconfig_stop() );
         ESP_ERROR_CHECK( esp_smartconfig_set_type(SC_TYPE_ESPTOUCH_AIRKISS) );
         ESP_ERROR_CHECK( esp_smartconfig_start(sc_callback) );
