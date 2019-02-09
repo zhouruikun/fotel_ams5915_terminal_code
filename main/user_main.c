@@ -38,14 +38,21 @@
 #include "nvs_flash.h"
 #include "tcpip_adapter.h"
 #include "esp_smartconfig.h"
-#include "cJSON.h"
+
 #include "led.h"
 #include "multi_button.h"
 #include "asm_5915.h"
 #include "common.h"
 #include "http_request.h"
+uint8_t sta_mac[8] = {0};
+static const char *TAG = "idle";
+ uint8_t sta_mac_str[18] = {0};
+ void hex_str(unsigned char *inchar, unsigned int len, unsigned char *outtxt);
+
 
  
+
+
 void app_main()
 {
     
@@ -61,16 +68,41 @@ void app_main()
     // cJSON_AddItemToObject(item, "slots", next);//semantic节点下添加item节点
     // cJSON_AddItemToObject(next, "name", cJSON_CreateString("张三"));//添加name节点
 
-    // printf("%s\n", cJSON_Print(root));
-
-    
-    xTaskCreate(led_task, "led_task", 512, NULL, 2, NULL);
-    xTaskCreate(button_task, "button_task", 1024, NULL, 2, NULL);
-    xTaskCreate(I2C_AMS5915_Read_Task, "I2C_AMS5915_Read_Task", 1024, NULL, 2, NULL);
+ 
+ 
+ 
+    esp_read_mac(sta_mac, ESP_MAC_WIFI_STA);
+    hex_str(sta_mac, 6, sta_mac_str);
+    xTaskCreate(led_task, "led_task", 1024, NULL, 2, NULL);
+    xTaskCreate(button_task, "button_task", 2048, NULL, 2, NULL);
+    xTaskCreate(I2C_AMS5915_Read_Task, "I2C_AMS5915_Read_Task", 2048, NULL, 2, NULL);
     xTaskCreate(&http_get_task, "http_get_task", 16384, NULL, 5, NULL);
-    
-    initialise_wifi();
+  
+    Init_time();
+ while(1){
+           ESP_LOGI(TAG,"free heap = %d\r\n", esp_get_free_heap_size());
+           vTaskDelay(1000/portTICK_RATE_MS);   
+    /* code */
+ }
 }
 
-
  
+void hex_str(unsigned char *inchar, unsigned int len, unsigned char *outtxt)
+{
+   unsigned char hbit,lbit;
+   unsigned int i;
+   for(i=0;i<len;i++)
+    {
+      hbit = (*(inchar+i)&0xf0)>>4;
+      lbit = *(inchar+i)&0x0f;
+      if (hbit>9)
+          outtxt[2*i]='A'+hbit-10;
+        else
+          outtxt[2*i]='0'+hbit;
+      if (lbit>9)
+          outtxt[2*i+1]='A'+lbit-10;
+        else
+          outtxt[2*i+1]='0'+lbit;
+    }
+    outtxt[2*i] = 0;
+}

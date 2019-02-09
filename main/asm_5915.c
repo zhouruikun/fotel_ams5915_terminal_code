@@ -28,7 +28,7 @@
 
 
 
-#include "asm_5915.h"
+
 #include "common.h"
 #include "driver/i2c.h"
 #include "driver/hw_timer.h"
@@ -43,14 +43,21 @@
 #define I2C_AMS5915_ADD    0x28
 #define LAST_NACK_VAL                       0x2              /*!< I2C last_nack value */
 #define ACK_CHECK_EN                        0x1              /*!< I2C master will check ack from slave*/
+
+#define MAX_POINT 20
 /**
  * @brief i2c master initialization
  */
 unsigned char databuf[4]={0};
-float press=0;
-float ams5915_p;
-float ams5915_t;
-int temp_t=0;
+double press=0;
+double ams5915_p[MAX_POINT];
+double ams5915_t[MAX_POINT];
+int count_point=0;
+cJSON * item ;
+cJSON * root ;
+cJSON * data_array_press;
+cJSON * data_array_temp;
+double temp_t=0;
 static const char *TAG = "asm";
 static esp_err_t i2c_example_master_init()
 {
@@ -97,31 +104,65 @@ esp_err_t I2C_Readbuff( unsigned char I2C_Addr,unsigned char *buf)
 **³ö¿Ú²ÎÊý: ³É¹¦·µ»Ø0
 ************************************************************************************/
 extern     char str_asm[80];
-float I2C_AMS5915_Read(void)
+double I2C_AMS5915_Read(void)
 {
-	static short count=0;
+	static short count_filter=0;
+
      I2C_Readbuff( I2C_AMS5915_ADD,databuf);
 	temp_t=(databuf[2]<<3)|(databuf[3]>>5);
-	ams5915_t=(temp_t*200.0)/2048-50;
+	temp_t=(temp_t*200.0)/2048-50;
     // ESP_LOGI(TAG, "ams5915_t is %d\n",(int )(ams5915_t*100));
 	press=((databuf[0]&0x3f)<<8)|databuf[1];
-	count++;
-	if(count>50)
-	{count=0;}
-	ams5915_p=((press-1638)/((14745-1638)/5));//*0.04+ams5915_p*0.96;
-    // ESP_LOGI(TAG, "ams5915_p is %d\n",(int )(ams5915_p*100));
-    sprintf(str_asm, "ams5915_p = %d\r\nams5915_t = %d \r\n", (int )(ams5915_p*100),(int )(ams5915_t*100));
-   
-	return ams5915_p;
-	
+    press=((press-1638)/((14745-1638)/5));//*0.04+ams5915_p*0.96;
+	count_filter++;
+	if(count_filter>10)
+	{
+        count_filter=0;
+        ams5915_p[count_point]=press;
+        ams5915_t[count_point]=temp_t;
+        count_point++;
+        if(count_point>=MAX_POINT)
+             count_point=0;
+        // root =  cJSON_CreateObject();
+        // item =  cJSON_CreateObject();
+        // cJSON_AddItemToObject(root, "node_mac", cJSON_CreateString((char*)&sta_mac_str));//根节点下添加
+        // cJSON_AddItemToObject(root, "node_data_counts", cJSON_CreateNumber(0));
+        // cJSON_AddItemToObject(root, "data", item);//root节点下添加semantic节点
+        // cJSON_AddItemToObject(item, "ams5915_p", cJSON_CreateNumber(ams5915_p));
+        // cJSON_AddItemToObject(item, "ams5915_t", cJSON_CreateNumber(ams5915_t));
+
+    }
+	return ams5915_p[count_point];
 }
+
 void I2C_AMS5915_Read_Task(void *pvParameters)
-    {
-    printf("i2c_example_master_init:%d\n", i2c_example_master_init());
+{
+
+   ESP_LOGI(TAG,"i2c_example_master_init:%d\n", i2c_example_master_init());
     while(1)
     {
         I2C_AMS5915_Read();
- 
-        vTaskDelay(1000/portTICK_RATE_MS);   
+        vTaskDelay(100/portTICK_RATE_MS);   
     }
+}
+
+char * generate_str(void)
+{
+        char * str_request;
+        ESP_LOGI("TAG","free heap = %d\r\n", esp_get_free_heap_size());
+        root =  cJSON_CreateObject();
+        item =  cJSON_CreateObject();
+        data_array_press =  cJSON_CreateDoubleArray(ams5915_p, count_point);
+        data_array_temp =  cJSON_CreateDoubleArray(ams5915_t, count_point);
+        cJSON_AddItemToObject(root, "node_mac", cJSON_CreateString((char*)&sta_mac_str));//根节点下添加
+        cJSON_AddItemToObject(root, "update_time", cJSON_CreateString((char*)get_time()));//根节点下添加
+        cJSON_AddItemToObject(root, "node_data_counts", cJSON_CreateNumber(count_point));
+        cJSON_AddItemToObject(root, "data", item);//root节点下添加semantic节点
+        cJSON_AddItemToObject(item, "ams5915_p", data_array_press);
+        cJSON_AddItemToObject(item, "ams5915_t", data_array_temp);
+        str_request = cJSON_Print(root);
+        cJSON_Delete(root);   cJSON_Delete(item);   cJSON_Delete(data_array_press);   cJSON_Delete(data_array_temp);
+        ESP_LOGI("TAG","free heap = %d\r\n", esp_get_free_heap_size());
+        count_point = 0 ;
+        return str_request;
 }

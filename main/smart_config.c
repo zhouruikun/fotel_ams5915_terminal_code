@@ -14,6 +14,16 @@
 #include "esp_smartconfig.h"
 #include "smart_config.h"
 #include "spi_flash.h"
+
+
+#include <time.h>
+#include <sys/time.h>
+#include "esp_attr.h"
+#include "lwip/err.h"
+#include "lwip/apps/sntp.h"
+
+
+
 #define ADDR_MYCONF 250 //the 250 sector
 #define ADDR_SC 252 //the 250 sector
 
@@ -32,7 +42,7 @@ static const char *TAG = "smart config";
 wifi_config_t my_config;
 void smartconfig_task(void *pvParameters);
 void smartconfig_example_task(void * parm);
-
+ static void obtain_time(void);
 static esp_err_t event_handler(void *ctx, system_event_t *event)
 {
     switch(event->event_id) {
@@ -171,6 +181,7 @@ void smartconfig_task(void *pvParameters)
     while (1) {
         uxBits = xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT | ESPTOUCH_DONE_BIT, true, false, portMAX_DELAY); 
         if(uxBits & CONNECTED_BIT) {
+            // obtain_time();
             ESP_LOGI(TAG, "WiFi Connected to ap");
         }
         if(uxBits & ESPTOUCH_DONE_BIT) {

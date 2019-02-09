@@ -17,7 +17,7 @@
 #include <netdb.h>
 #include <sys/socket.h>
 
- 
+ #include "common.h"
  
  /* FreeRTOS event group to signal when we are connected & ready to make a request */
 extern EventGroupHandle_t wifi_event_group;
@@ -26,6 +26,7 @@ extern EventGroupHandle_t wifi_event_group;
    but we only care about one event - are we connected
    to the AP with an IP? */
 extern const int CONNECTING_BIT;
+extern const int CONNECTED_BIT;
 extern const int ESPTOUCH_DONE_BIT;
 void http_get_task(void *pvParameters);
 #endif

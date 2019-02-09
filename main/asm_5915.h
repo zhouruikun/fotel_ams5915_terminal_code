@@ -15,5 +15,7 @@
 #include "tcpip_adapter.h"
 #include "esp_smartconfig.h"
  void I2C_AMS5915_Read_Task(void *pvParameters);
+ char * generate_str(void);
+ 
 #endif
 

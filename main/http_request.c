@@ -21,7 +21,7 @@ static const char *REQUEST = "GET " WEB_URL " HTTP/1.0\r\n"
     "User-Agent: esp-idf/1.0 esp32\r\n"
     "\r\n\r\n" ;
 
-    char str_asm[80];
+char str_asm[80];
 
 void ICACHE_FLASH_ATTR  http_get_task(void *pvParameters)
 {
@@ -33,7 +33,8 @@ void ICACHE_FLASH_ATTR  http_get_task(void *pvParameters)
     struct in_addr *addr;
     int s, r;
     char recv_buf[64];
-
+    char * str_request;
+    initialise_wifi();
     while(1) {
         /* Wait for the callback to set the CONNECTED_BIT in the
            event group.
@@ -76,18 +77,22 @@ void ICACHE_FLASH_ATTR  http_get_task(void *pvParameters)
         ESP_LOGI(TAG, "... connected");
         freeaddrinfo(res);
 
+        str_request = generate_str();
         if (write(s, REQUEST, strlen(REQUEST)) < 0) {
             ESP_LOGE(TAG, "... socket send failed");
             close(s);
             vTaskDelay(4000 / portTICK_PERIOD_MS);
             continue;
         }
-        if (write(s, str_asm, strlen(str_asm)) < 0) {
+        // ESP_LOGE(TAG,"%s\n",str_request );
+        if (write(s, str_request, strlen(str_request)) < 0) {
             ESP_LOGE(TAG, "... socket send failed");
             close(s);
             vTaskDelay(4000 / portTICK_PERIOD_MS);
+            free(str_request);
             continue;
         }
+        cJSON_free(str_request);
         ESP_LOGI(TAG, "... socket send success");
 
         struct timeval receiving_timeout;
@@ -113,7 +118,7 @@ void ICACHE_FLASH_ATTR  http_get_task(void *pvParameters)
 
         ESP_LOGI(TAG, "... done reading from socket. Last read return=%d errno=%d\r\n", r, errno);
         close(s);
-        for(int countdown = 10; countdown >= 0; countdown--) {
+        for(int countdown = 5; countdown >= 0; countdown--) {
             ESP_LOGI(TAG, "%d... ", countdown);
             vTaskDelay(1000 / portTICK_PERIOD_MS);
         }
