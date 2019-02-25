@@ -7,13 +7,13 @@
 #include "freertos/FreeRTOS.h"
  #include "freertos/task.h"
  #include "driver/gpio.h"
-#include "gpio.h"
+ 
 #include "common.h"
 #define EVENT_CB(ev)   if(handle->cb[ev])handle->cb[ev]((Button*)handle)
 	
 //button handle list head.
 static struct Button* head_handle = NULL;
-
+static const char *TAG = "multi_button";
 /**
   * @brief  Initializes the button struct handle.
   * @param  handle: the button handle strcut.
@@ -214,14 +214,16 @@ uint8_t read_button1_GPIO()
 
 void BTN1_LONG_RRESS_START_Handler(void* btn)
 {
-    printf("BTN1_LONG_RRESS_START_Handler\n");
+   ESP_LOGI(TAG,"BTN1_LONG_RRESS_START_Handler\n");
     xTaskCreate(smartconfig_task, "smartconfig_task", 2048,(void*) 1, 2, NULL);
 
 }
 void BTN1_SINGLE_Click_Handler(void* btn)
 {
-    printf("BTN1_SINGLE_Click_Handler\n");
+  ESP_LOGI(TAG,"BTN1_SINGLE_Click_Handler\n");
 }
+
+ 
    struct Button btn1;
 
 

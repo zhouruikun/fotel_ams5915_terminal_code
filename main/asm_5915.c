@@ -32,8 +32,8 @@
 #include "common.h"
 #include "driver/i2c.h"
 #include "driver/hw_timer.h"
-#define I2C_EXAMPLE_MASTER_SCL_IO           2               /*!< gpio number for I2C master clock */
-#define I2C_EXAMPLE_MASTER_SDA_IO           14               /*!< gpio number for I2C master data  */
+#define I2C_EXAMPLE_MASTER_SCL_IO           5               /*!< gpio number for I2C master clock */
+#define I2C_EXAMPLE_MASTER_SDA_IO           4               /*!< gpio number for I2C master data  */
 #define I2C_EXAMPLE_MASTER_NUM              I2C_NUM_0        /*!< I2C port number for master dev */
 #define I2C_EXAMPLE_MASTER_TX_BUF_DISABLE   0                /*!< I2C master do not need buffer */
 #define I2C_EXAMPLE_MASTER_RX_BUF_DISABLE   0                /*!< I2C master do not need buffer */
@@ -92,6 +92,8 @@ esp_err_t I2C_Readbuff( unsigned char I2C_Addr,unsigned char *buf)
     i2c_cmd_link_delete(cmd);
 
     if (ret != ESP_OK) {
+         ESP_LOGI(TAG,"i2c_master_cmd_begin error =%d",ret);
+         
         return ret;
     }
      return ESP_OK;
@@ -111,7 +113,6 @@ double I2C_AMS5915_Read(void)
      I2C_Readbuff( I2C_AMS5915_ADD,databuf);
 	temp_t=(databuf[2]<<3)|(databuf[3]>>5);
 	temp_t=(temp_t*200.0)/2048-50;
-    // ESP_LOGI(TAG, "ams5915_t is %d\n",(int )(ams5915_t*100));
 	press=((databuf[0]&0x3f)<<8)|databuf[1];
     press=((press-1638)/((14745-1638)/5));//*0.04+ams5915_p*0.96;
 	count_filter++;
@@ -123,13 +124,6 @@ double I2C_AMS5915_Read(void)
         count_point++;
         if(count_point>=MAX_POINT)
              count_point=0;
-        // root =  cJSON_CreateObject();
-        // item =  cJSON_CreateObject();
-        // cJSON_AddItemToObject(root, "node_mac", cJSON_CreateString((char*)&sta_mac_str));//根节点下添加
-        // cJSON_AddItemToObject(root, "node_data_counts", cJSON_CreateNumber(0));
-        // cJSON_AddItemToObject(root, "data", item);//root节点下添加semantic节点
-        // cJSON_AddItemToObject(item, "ams5915_p", cJSON_CreateNumber(ams5915_p));
-        // cJSON_AddItemToObject(item, "ams5915_t", cJSON_CreateNumber(ams5915_t));
 
     }
 	return ams5915_p[count_point];
@@ -149,7 +143,6 @@ void I2C_AMS5915_Read_Task(void *pvParameters)
 char * generate_str(void)
 {
         char * str_request;
-        ESP_LOGI("TAG","free heap = %d\r\n", esp_get_free_heap_size());
         root =  cJSON_CreateObject();
         item =  cJSON_CreateObject();
         data_array_press =  cJSON_CreateDoubleArray(ams5915_p, count_point);
@@ -162,7 +155,6 @@ char * generate_str(void)
         cJSON_AddItemToObject(item, "ams5915_t", data_array_temp);
         str_request = cJSON_Print(root);
         cJSON_Delete(root);   cJSON_Delete(item);   cJSON_Delete(data_array_press);   cJSON_Delete(data_array_temp);
-        ESP_LOGI("TAG","free heap = %d\r\n", esp_get_free_heap_size());
         count_point = 0 ;
         return str_request;
 }

@@ -7,6 +7,7 @@ extern "C" {
 #include "asm_5915.h"
 #include "smart_config.h"
 #include "sntp_time.h"
+#include "led.h"
 #define GPIO_INPUT_IO    13
 #define GPIO_INPUT_PIN_SEL  ((1ULL<<GPIO_INPUT_IO))
 uint8_t read_button1_GPIO() ;

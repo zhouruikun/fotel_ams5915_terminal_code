@@ -9,6 +9,7 @@
 typedef enum
 {
      LED_BLUE,
+	 LED_RED,
 	 MAX_LED
 }led;
 typedef struct 

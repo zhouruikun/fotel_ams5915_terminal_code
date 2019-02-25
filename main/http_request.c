@@ -75,13 +75,10 @@ void ICACHE_FLASH_ATTR  http_get_task(void *pvParameters)
             vTaskDelay(4000 / portTICK_PERIOD_MS);
             continue;
         }
-
         ESP_LOGI(TAG, "... connected");
         freeaddrinfo(res);
         str_request = generate_str();
-
         char *str_request_all = (char *) malloc(strlen(REQUEST) + strlen(str_request));
-        // sprintf(str_request_all, "%s%s", REQUEST, str_request);
         strcpy(str_request_all, REQUEST);
         sprintf(Header,REQUEST,strlen(str_request));
         strcpy(str_request_all, Header);
@@ -94,14 +91,6 @@ void ICACHE_FLASH_ATTR  http_get_task(void *pvParameters)
             free(str_request_all);
             continue;
         }
-        // // ESP_LOGE(TAG,"%s\n",str_request );
-        // if (write(s, str_request, strlen(str_request)) < 0) {
-        //     ESP_LOGE(TAG, "... socket send failed");
-        //     close(s);
-        //     vTaskDelay(4000 / portTICK_PERIOD_MS);
-        //     cJSON_free(str_request);
-        //     continue;
-        // }
          free(str_request_all);
         cJSON_free(str_request);
         ESP_LOGI(TAG, "... socket send success");
@@ -126,7 +115,15 @@ void ICACHE_FLASH_ATTR  http_get_task(void *pvParameters)
                 putchar(recv_buf[i]);
             }
         } while(r > 0);
-
+        if (r>=0 ) {
+            startLed(LED_RED ,1000,150);
+        }
+        else
+        {
+            stopLed(LED_RED);
+        }
+        
+        
         ESP_LOGI(TAG, "... done reading from socket. Last read return=%d errno=%d\r\n", r, errno);
         close(s);
         for(int countdown = 5; countdown >= 0; countdown--) {

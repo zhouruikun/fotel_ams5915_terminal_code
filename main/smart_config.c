@@ -50,6 +50,7 @@ static esp_err_t event_handler(void *ctx, system_event_t *event)
         xTaskCreate(smartconfig_task, "smartconfig_task", 4096, NULL, 3, NULL);
         break;
     case SYSTEM_EVENT_STA_GOT_IP:
+        startLed(LED_BLUE ,2000,300);
         xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
         xEventGroupSetBits(wifi_event_group, CONNECTING_BIT);
         break;
@@ -85,11 +86,13 @@ static void sc_callback(smartconfig_status_t status, void *pdata)
             break;
         case SC_STATUS_FIND_CHANNEL:
             ESP_LOGI(TAG, "SC_STATUS_FINDING_CHANNEL");
+            startLed(LED_BLUE ,500,250);
             break;
         case SC_STATUS_GETTING_SSID_PSWD:
             ESP_LOGI(TAG, "SC_STATUS_GETTING_SSID_PSWD");
             break;
         case SC_STATUS_LINK:
+            startLed(LED_BLUE ,1000,500);
             ESP_LOGI(TAG, "SC_STATUS_LINK");
             wifi_config_t *wifi_config = pdata;
             ESP_LOGI(TAG, "SSID:%s", wifi_config->sta.ssid);
