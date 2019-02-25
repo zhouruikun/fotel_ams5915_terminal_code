@@ -31,6 +31,7 @@
 
 #include "common.h"
 #include "driver/i2c.h"
+#include "driver/uart.h"
 #include "driver/hw_timer.h"
 #define I2C_EXAMPLE_MASTER_SCL_IO           5               /*!< gpio number for I2C master clock */
 #define I2C_EXAMPLE_MASTER_SDA_IO           4               /*!< gpio number for I2C master data  */
@@ -129,16 +130,52 @@ double I2C_AMS5915_Read(void)
 	return ams5915_p[count_point];
 }
 
+#define BUF_SIZE 256
 void I2C_AMS5915_Read_Task(void *pvParameters)
 {
-
+        // Configure parameters of an UART driver,
+    // communication pins and install the driver
+    uart_config_t uart_config = {
+        .baud_rate = 76800,
+        .data_bits = UART_DATA_8_BITS,
+        .parity    = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE
+    };
+    uart_param_config(UART_NUM_0, &uart_config);
+    uart_driver_install(UART_NUM_0, BUF_SIZE * 2, 0, 0, NULL);
+    uart_write_bytes(UART_NUM_0, (const char *) "data", 4);
+    // Configure a temporary buffer for the incoming data
+    uint8_t *data = (uint8_t *) malloc(BUF_SIZE);
+    uint8_t *str = (uint8_t *) malloc(BUF_SIZE);
+    //A5 5A 07 82 00 00 00 01 00 02
+    data[0]=0xa5;data[1]=0x5a;    data[2]=0x07;data[3]=0x82;    data[4]=0;data[5]=0;
    ESP_LOGI(TAG,"i2c_example_master_init:%d\n", i2c_example_master_init());
     while(1)
     {
-        I2C_AMS5915_Read();
+
+        I2C_AMS5915_Read(); 
+        short temp_t_i = (short)(temp_t*100);
+        short press_i = (short)(press*100);
+        data[6]=((temp_t_i&0xff00)>>8);data[7]=((temp_t_i&0x00ff));  
+        data[8]= ((press_i&0xff00)>>8);data[9]=((press_i&0x00ff));  
+        hex_str(data, 10, str);
+        uart_write_bytes(UART_NUM_0, (const char *) data, 10);
+        // int len = uart_read_bytes(UART_NUM_0, data, BUF_SIZE, 20 / portTICK_RATE_MS);
         vTaskDelay(100/portTICK_RATE_MS);   
     }
 }
+
+// void I2C_AMS5915_Read_Task(void *pvParameters)
+// {
+
+//    ESP_LOGI(TAG,"i2c_example_master_init:%d\n", i2c_example_master_init());
+//     while(1)
+//     {
+//         I2C_AMS5915_Read();
+//         vTaskDelay(100/portTICK_RATE_MS);   
+//     }
+// }
 
 char * generate_str(void)
 {

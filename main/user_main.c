@@ -56,32 +56,7 @@ static const char *TAG = "idle";
 #define GPIO_OUTPUT_IO_1    14
 #define GPIO_OUTPUT_IO_KEY    13
 #define GPIO_OUTPUT_PIN_SEL  ((1ULL<<GPIO_OUTPUT_IO_0) | (1ULL<<GPIO_OUTPUT_IO_1))
-#define BUF_SIZE (1024)
-static void echo_task()
-{
-    // Configure parameters of an UART driver,
-    // communication pins and install the driver
-    uart_config_t uart_config = {
-        .baud_rate = 74880,
-        .data_bits = UART_DATA_8_BITS,
-        .parity    = UART_PARITY_DISABLE,
-        .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE
-    };
-    uart_param_config(UART_NUM_0, &uart_config);
-    uart_driver_install(UART_NUM_0, BUF_SIZE * 2, 0, 0, NULL);
-    uart_write_bytes(UART_NUM_0, (const char *) "data", 4);
-    // Configure a temporary buffer for the incoming data
-    uint8_t *data = (uint8_t *) malloc(BUF_SIZE);
-
-    while (1) {
-        // Read data from the UART
-        int len = uart_read_bytes(UART_NUM_0, data, BUF_SIZE, 20 / portTICK_RATE_MS);
-        // Write data back to the UART
-        uart_write_bytes(UART_NUM_0, (const char *) data, len);
-    }
-}
-
+ 
 
 void app_main()
 {
@@ -109,7 +84,7 @@ void app_main()
  
   
 
-    xTaskCreate(echo_task, "uart_echo_task", 1024, NULL, 10, NULL);
+    
     xTaskCreate(led_task, "led_task", 1024, NULL, 2, NULL);
     xTaskCreate(button_task, "button_task", 2048, NULL, 2, NULL);
     xTaskCreate(I2C_AMS5915_Read_Task, "I2C_AMS5915_Read_Task", 2048, NULL, 2, NULL);
