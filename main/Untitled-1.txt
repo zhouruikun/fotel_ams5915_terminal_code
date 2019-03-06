@@ -22,7 +22,8 @@
 #include "lwip/err.h"
 #include "lwip/apps/sntp.h"
 
-
+#include "nvs_flash.h"
+#include "nvs.h"
 
 #define ADDR_MYCONF 250 //the 250 sector
 #define ADDR_SC 252 //the 250 sector
@@ -137,22 +138,29 @@ void smartconfig_example_task(void * parm)
         }
     }
 }
-
+#define SC_NAMESPACE "smartc"
 void smartconfig_task(void *pvParameters)
 {
-	uint32_t sc_count=0;
-     EventBits_t uxBits;
+	uint8_t sc_count=0;
+    EventBits_t uxBits;
+    nvs_handle my_handle;
+    esp_err_t err;
+
+
+    initialise_wifi();
+
 	if(pvParameters == NULL)
 	{
+        err = nvs_open(SC_NAMESPACE, NVS_READWRITE, &my_handle);
 		sc_count=0;
-		spi_flash_read(ADDR_SC*4096,(uint32_t *)&sc_count,sizeof(sc_count));
+        nvs_get_u8(my_handle ,"onoffcnt",&sc_count);
 		ESP_LOGI(TAG,"smartconfig_onoff sc_count=%u\r\n",sc_count);	
 		if(sc_count>3)
 		{
 			ESP_LOGI(TAG,"smartconfig_start sc_count=%u\r\n",sc_count);	
 			sc_count=0;
-			spi_flash_erase_sector(ADDR_SC);
-			spi_flash_write(ADDR_SC*4096,(uint32_t *)&sc_count,sizeof(sc_count));
+            nvs_set_u8(my_handle ,"onoffcnt",&sc_count);
+            err = nvs_commit(my_handle);
             ESP_ERROR_CHECK( esp_smartconfig_set_type(SC_TYPE_ESPTOUCH_AIRKISS) );
             ESP_ERROR_CHECK( esp_smartconfig_start(sc_callback) );
 		}
@@ -161,9 +169,8 @@ void smartconfig_task(void *pvParameters)
 			ESP_LOGI(TAG,"connecting......\r\n");	
 			
 			sc_count=sc_count+1;
-			spi_flash_erase_sector(ADDR_SC);
-			spi_flash_write(ADDR_SC*4096,(uint32_t *)&sc_count,sizeof(sc_count));
-
+            nvs_set_u8(my_handle ,"onoffcnt",&sc_count);
+            err = nvs_commit(my_handle);
 			spi_flash_read(ADDR_MYCONF*4096,(uint32_t *)&my_config,sizeof( wifi_config_t));
 			sc_callback(SC_STATUS_LINK,(void *)&my_config);
 			vTaskDelay(3000 / portTICK_RATE_MS);  //send every 1 seconds
@@ -172,6 +179,7 @@ void smartconfig_task(void *pvParameters)
 			spi_flash_erase_sector(ADDR_SC);
 			spi_flash_write(ADDR_SC*4096,(uint32_t *)&sc_count,sizeof(sc_count));
 		}
+          nvs_close(my_handle);
 	}
 	else
 	{	

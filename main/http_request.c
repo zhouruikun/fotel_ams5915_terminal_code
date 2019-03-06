@@ -11,14 +11,15 @@
 /* Constants that aren't configurable in menuconfig */
 // #define WEB_URL "/dev/put_data"
 // #define WEB_SERVER "192.168.0.106"
-#define WEB_PORT "7513"
-#define WEB_URL "/dev/put_data"
-#define WEB_SERVER "106.14.226.150"
+#define WEB_PORT "9527"
+#define WEB_URL "/put_data"
+#define WEB_SERVER "47.100.122.195"
 static const char *TAG = "http";
 
 static const char *REQUEST = "GET " WEB_URL " HTTP/1.0\r\n"
     "Host: "WEB_SERVER":"WEB_PORT"\r\n"
     "User-Agent: esp-idf/1.0 esp32\r\n"
+    "Content-Type: application/json\r\n"
     "content-length: %d"
     "\r\n\r\n" ;
 char * Header[100] = {0};
@@ -41,8 +42,19 @@ void ICACHE_FLASH_ATTR  http_get_task(void *pvParameters)
         /* Wait for the callback to set the CONNECTED_BIT in the
            event group.
         */
+        stopLed(LED_RED);
         xEventGroupWaitBits(wifi_event_group, CONNECTING_BIT,
                             false, false, portMAX_DELAY);
+
+
+
+
+        str_request = generate_str();
+        if(str_request==NULL)//数据无变化 无需上传
+        {
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            continue;
+        }                   
         ESP_LOGI(TAG, "Connecting to AP");
 
         int err = getaddrinfo(WEB_SERVER, WEB_PORT , &hints, &res);
@@ -77,7 +89,7 @@ void ICACHE_FLASH_ATTR  http_get_task(void *pvParameters)
         }
         ESP_LOGI(TAG, "... connected");
         freeaddrinfo(res);
-        str_request = generate_str();
+
         char *str_request_all = (char *) malloc(strlen(REQUEST) + strlen(str_request));
         strcpy(str_request_all, REQUEST);
         sprintf(Header,REQUEST,strlen(str_request));
@@ -118,18 +130,20 @@ void ICACHE_FLASH_ATTR  http_get_task(void *pvParameters)
         if (r>=0 ) {
             startLed(LED_RED ,1000,150);
         }
-        else
-        {
-            stopLed(LED_RED);
-        }
-        
-        
         ESP_LOGI(TAG, "... done reading from socket. Last read return=%d errno=%d\r\n", r, errno);
         close(s);
-        for(int countdown = 5; countdown >= 0; countdown--) {
-            ESP_LOGI(TAG, "%d... ", countdown);
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
+        while(1)
+        {
+            if(check_update())
+            {
+                break;
+            }
+            vTaskDelay(200 / portTICK_PERIOD_MS);
         }
+       for(int countdown = 5; countdown >= 0; countdown--) {
+                    ESP_LOGI(TAG, "%d... ", countdown);
+                    vTaskDelay(1000 / portTICK_PERIOD_MS);
+                }
         ESP_LOGI(TAG, "Starting again!");
     }
 }

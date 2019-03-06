@@ -33,8 +33,8 @@
 #include "driver/i2c.h"
 #include "driver/uart.h"
 #include "driver/hw_timer.h"
-#define I2C_EXAMPLE_MASTER_SCL_IO           5               /*!< gpio number for I2C master clock */
-#define I2C_EXAMPLE_MASTER_SDA_IO           4               /*!< gpio number for I2C master data  */
+#define I2C_EXAMPLE_MASTER_SCL_IO           4               /*!< gpio number for I2C master clock */
+#define I2C_EXAMPLE_MASTER_SDA_IO           5               /*!< gpio number for I2C master data  */
 #define I2C_EXAMPLE_MASTER_NUM              I2C_NUM_0        /*!< I2C port number for master dev */
 #define I2C_EXAMPLE_MASTER_TX_BUF_DISABLE   0                /*!< I2C master do not need buffer */
 #define I2C_EXAMPLE_MASTER_RX_BUF_DISABLE   0                /*!< I2C master do not need buffer */
@@ -58,8 +58,10 @@ cJSON * item ;
 cJSON * root ;
 cJSON * data_array_press;
 cJSON * data_array_temp;
-double temp_t=0;
+double temperature=0;
 static const char *TAG = "asm";
+    static double last_temp=0;
+    static double last_ams=0;
 static esp_err_t i2c_example_master_init()
 {
     int i2c_master_port = I2C_EXAMPLE_MASTER_NUM;
@@ -110,18 +112,23 @@ extern     char str_asm[80];
 double I2C_AMS5915_Read(void)
 {
 	static short count_filter=0;
-
+    static double temperature_last = 0;
+    static double press_last = 0;
      I2C_Readbuff( I2C_AMS5915_ADD,databuf);
-	temp_t=(databuf[2]<<3)|(databuf[3]>>5);
-	temp_t=(temp_t*200.0)/2048-50;
+	temperature=(databuf[2]<<3)|(databuf[3]>>5);
+	temperature=(temperature*200.0)/2048-50;
+    temperature = temperature*0.1+temperature_last*0.9;
+    temperature_last = temperature;
 	press=((databuf[0]&0x3f)<<8)|databuf[1];
     press=((press-1638)/((14745-1638)/5));//*0.04+ams5915_p*0.96;
+    press = press*0.1+press_last*0.9;
+    press_last = press;
 	count_filter++;
 	if(count_filter>10)
 	{
         count_filter=0;
-        ams5915_p[count_point]=press;
-        ams5915_t[count_point]=temp_t;
+        ams5915_p[count_point]=press*100;
+        ams5915_t[count_point]=temperature*100;
         count_point++;
         if(count_point>=MAX_POINT)
              count_point=0;
@@ -149,18 +156,26 @@ void I2C_AMS5915_Read_Task(void *pvParameters)
     uint8_t *data = (uint8_t *) malloc(BUF_SIZE);
     uint8_t *str = (uint8_t *) malloc(BUF_SIZE);
     //A5 5A 07 82 00 00 00 01 00 02
-    data[0]=0xa5;data[1]=0x5a;    data[2]=0x07;data[3]=0x82;    data[4]=0;data[5]=0;
+    data[0]=0xa5;data[1]=0x5a;    data[2]=0x09;data[3]=0x82;    data[4]=0;data[5]=0; data[10]= 0; data[11]=0x00;
    ESP_LOGI(TAG,"i2c_example_master_init:%d\n", i2c_example_master_init());
+   short cnt=0;
     while(1)
     {
 
+
         I2C_AMS5915_Read(); 
-        short temp_t_i = (short)(temp_t*100);
+        short temp_t_i = (short)(temperature*100);
         short press_i = (short)(press*100);
         data[6]=((temp_t_i&0xff00)>>8);data[7]=((temp_t_i&0x00ff));  
-        data[8]= ((press_i&0xff00)>>8);data[9]=((press_i&0x00ff));  
-        hex_str(data, 10, str);
-        uart_write_bytes(UART_NUM_0, (const char *) data, 10);
+        data[8]= ((press_i&0xff00)>>8);data[9]=((press_i&0x00ff)); 
+        cnt++;
+        if(cnt>5)
+        {
+            cnt=0;
+            data[11]^=0x01;  
+        }
+        hex_str(data, 12, str);
+        uart_write_bytes(UART_NUM_0, (const char *) data, 12);uart_write_bytes(UART_NUM_0, (const char *) str, 24);
         // int len = uart_read_bytes(UART_NUM_0, data, BUF_SIZE, 20 / portTICK_RATE_MS);
         vTaskDelay(100/portTICK_RATE_MS);   
     }
@@ -176,22 +191,58 @@ void I2C_AMS5915_Read_Task(void *pvParameters)
 //         vTaskDelay(100/portTICK_RATE_MS);   
 //     }
 // }
-
+ #include <time.h>
+#include <sys/time.h>
 char * generate_str(void)
 {
+        time_t now_time= 0;
         char * str_request;
+        time(&now_time);
         root =  cJSON_CreateObject();
         item =  cJSON_CreateObject();
+        last_temp = ams5915_t[count_point-1];
+        last_ams = ams5915_p[count_point-1];
+
+        
+
         data_array_press =  cJSON_CreateDoubleArray(ams5915_p, count_point);
         data_array_temp =  cJSON_CreateDoubleArray(ams5915_t, count_point);
-        cJSON_AddItemToObject(root, "node_mac", cJSON_CreateString((char*)&sta_mac_str));//根节点下添加
-        cJSON_AddItemToObject(root, "update_time", cJSON_CreateString((char*)get_time()));//根节点下添加
-        cJSON_AddItemToObject(root, "node_data_counts", cJSON_CreateNumber(count_point));
+
+        cJSON_AddItemToObject(root, "nodeMac", cJSON_CreateString((char*)&sta_mac_str));//根节点下添加
+        cJSON_AddItemToObject(root, "updateTime", cJSON_CreateNumber(now_time) );//根节点下添加
+        cJSON_AddItemToObject(root, "nodeType", cJSON_CreateString("AMS"));//根节点下添加
+        cJSON_AddItemToObject(root, "nodeDataCounts", cJSON_CreateNumber(count_point));
         cJSON_AddItemToObject(root, "data", item);//root节点下添加semantic节点
+
         cJSON_AddItemToObject(item, "ams5915_p", data_array_press);
         cJSON_AddItemToObject(item, "ams5915_t", data_array_temp);
+
         str_request = cJSON_Print(root);
         cJSON_Delete(root);   cJSON_Delete(item);   cJSON_Delete(data_array_press);   cJSON_Delete(data_array_temp);
         count_point = 0 ;
         return str_request;
+}
+#define GAP_TEMP 30
+#define GAP_AMS  3
+#define HEART_PACK  3
+bool check_update(void)
+{
+    //定时判断是否需要上传数据 标准为本次数据与上次上传数据差值是否大于范围 外加定时2分钟一个心跳包
+        static time_t time_start= 0;
+        time_t  now_time_end= 0;
+        char * str_request;
+        time(&now_time_end);
+         if(abs(last_temp-temperature*100)>GAP_TEMP||abs(last_ams-press*100)>GAP_AMS||(now_time_end-time_start)>60*HEART_PACK)
+         {
+             time(&time_start);
+             return true;
+         }
+         else
+         {
+             
+             count_point=0;
+             return false;
+         }
+ 
+
 }
