@@ -17,5 +17,6 @@
  void I2C_AMS5915_Read_Task(void *pvParameters);
  char * generate_str(void);
  bool check_update(void);
+ char * generate_strforpoint(void);
 #endif
 

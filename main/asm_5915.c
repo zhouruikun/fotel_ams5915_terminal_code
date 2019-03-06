@@ -53,6 +53,8 @@ unsigned char databuf[4]={0};
 double press=0;
 double ams5915_p[MAX_POINT];
 double ams5915_t[MAX_POINT];
+     int   press_one_point ;
+    int    temperature_one_point;
 int count_point=0;
 cJSON * item ;
 cJSON * root ;
@@ -126,6 +128,8 @@ double I2C_AMS5915_Read(void)
 	count_filter++;
 	if(count_filter>10)
 	{
+        press_one_point = press*100;
+        temperature_one_point = temperature*100;
         count_filter=0;
         ams5915_p[count_point]=press*100;
         ams5915_t[count_point]=temperature*100;
@@ -216,6 +220,35 @@ char * generate_str(void)
 
         cJSON_AddItemToObject(item, "ams5915_p", data_array_press);
         cJSON_AddItemToObject(item, "ams5915_t", data_array_temp);
+
+        str_request = cJSON_Print(root);
+        cJSON_Delete(root);   cJSON_Delete(item);   cJSON_Delete(data_array_press);   cJSON_Delete(data_array_temp);
+        count_point = 0 ;
+        return str_request;
+}
+
+char * generate_strforpoint(void)
+{
+        time_t now_time= 0;
+        char * str_request;
+        time(&now_time);
+        root =  cJSON_CreateObject();
+        item =  cJSON_CreateObject();
+        last_temp = ams5915_t[count_point-1];
+        last_ams = ams5915_p[count_point-1];
+
+        
+
+        data_array_press =  cJSON_CreateDoubleArray(ams5915_p, count_point);
+        data_array_temp =  cJSON_CreateDoubleArray(ams5915_t, count_point);
+
+        cJSON_AddItemToObject(root, "nodeMac", cJSON_CreateString((char*)&sta_mac_str));//根节点下添加
+        cJSON_AddItemToObject(root, "updateTime", cJSON_CreateNumber(now_time) );//根节点下添加
+        cJSON_AddItemToObject(root, "nodeType", cJSON_CreateString("AMS"));//根节点下添加
+        cJSON_AddItemToObject(root, "nodeDataCounts", cJSON_CreateNumber(1));
+        cJSON_AddItemToObject(root, "data", item);//root节点下添加semantic节点
+        cJSON_AddItemToObject(item, "ams5915_p", cJSON_CreateNumber(press_one_point));
+        cJSON_AddItemToObject(item, "ams5915_t", cJSON_CreateNumber(temperature_one_point));
 
         str_request = cJSON_Print(root);
         cJSON_Delete(root);   cJSON_Delete(item);   cJSON_Delete(data_array_press);   cJSON_Delete(data_array_temp);

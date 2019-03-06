@@ -45,11 +45,7 @@ void ICACHE_FLASH_ATTR  http_get_task(void *pvParameters)
         stopLed(LED_RED);
         xEventGroupWaitBits(wifi_event_group, CONNECTING_BIT,
                             false, false, portMAX_DELAY);
-
-
-
-
-        str_request = generate_str();
+        str_request = generate_strforpoint();
         if(str_request==NULL)//数据无变化 无需上传
         {
             vTaskDelay(1000 / portTICK_PERIOD_MS);
@@ -132,19 +128,15 @@ void ICACHE_FLASH_ATTR  http_get_task(void *pvParameters)
         }
         ESP_LOGI(TAG, "... done reading from socket. Last read return=%d errno=%d\r\n", r, errno);
         close(s);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
         while(1)
         {
             if(check_update())
             {
                 break;
             }
-            vTaskDelay(200 / portTICK_PERIOD_MS);
+            vTaskDelay(100 / portTICK_PERIOD_MS);
         }
-       for(int countdown = 5; countdown >= 0; countdown--) {
-                    ESP_LOGI(TAG, "%d... ", countdown);
-                    vTaskDelay(1000 / portTICK_PERIOD_MS);
-                }
-        ESP_LOGI(TAG, "Starting again!");
     }
 }
 
