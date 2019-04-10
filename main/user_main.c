@@ -81,15 +81,10 @@ void app_main()
     register_led(LED_BLUE ,GPIO_OUTPUT_IO_1,0);//led指示灯
     register_led(LED_RED ,GPIO_OUTPUT_IO_0,0);//led指示灯
  
- 
-  
-
-    
     xTaskCreate(led_task, "led_task", 1024, NULL, 2, NULL);
     xTaskCreate(button_task, "button_task", 2048, NULL, 2, NULL);
     xTaskCreate(I2C_AMS5915_Read_Task, "I2C_AMS5915_Read_Task", 2048, NULL, 2, NULL);
     xTaskCreate(&http_get_task, "http_get_task", 16384, NULL, 5, NULL);
-    xTaskCreate(led_task, "led_task", 256, NULL, 2, NULL);
 
     Init_time();
  while(1){
