@@ -31,6 +31,7 @@
 #include "driver/i2c.h"
 #include "driver/uart.h"
 #include "driver/hw_timer.h"
+#include "spi_flash.h"
 #define I2C_EXAMPLE_MASTER_SCL_IO 4         /*!< gpio number for I2C master clock */
 #define I2C_EXAMPLE_MASTER_SDA_IO 5         /*!< gpio number for I2C master data  */
 #define I2C_EXAMPLE_MASTER_NUM I2C_NUM_0    /*!< I2C port number for master dev */
@@ -44,6 +45,8 @@
 #define ACK_CHECK_EN 0x1  /*!< I2C master will check ack from slave*/
 
 #define MAX_POINT 20
+
+#define ADDR_OFFSET 248 //the 250 sector
 /**
  * @brief i2c master initialization
  */
@@ -112,6 +115,33 @@ esp_err_t I2C_Readbuff(unsigned char I2C_Addr, unsigned char *buf)
 **³ö¿Ú²ÎÊý: ³É¹¦·µ»Ø0
 ************************************************************************************/
 extern char str_asm[80];
+
+int get_speed(double stress)
+{
+    if (stress > 0)
+    {
+        /* code */
+        return (0.83 * sqrt(2 * (press * 100) / 1.293) - 0.2) * 100-speed_offset; //press*100;//计算风速(0.83*Math.sqrt(2*(stress)/1.293)-0.2).toFixed(2);
+    }
+    else
+    {
+        return -(0.83 * sqrt(2 * (-press * 100) / 1.293) - 0.2) * 100 - speed_offset; //press*100;//计算风速(0.83*Math.sqrt(2*(stress)/1.293)-0.2).toFixed(2);
+    }
+}
+double get_stress_offset(int speed_offset)
+{  
+
+    if (speed_offset > 0)
+    {
+        
+        return   pow(((speed_offset/100.0+0.2)/0.83),2)*1.293/2;
+    }
+    else
+    {
+        return   -pow(((speed_offset/100.0+0.2)/0.83),2)*1.293/2;
+    }
+    
+}
 double I2C_AMS5915_Read(void)
 {
     static short count_filter = 0;
@@ -129,23 +159,18 @@ double I2C_AMS5915_Read(void)
     count_filter++;
     if (count_filter > 10)
     {
-        if (DEBUG) {
-            
-            ESP_LOGI(TAG, "speed_one_point:%d press:%d speed_offset:%d\n", speed_one_point,(int)(press*100),speed_offset);
+        if (DEBUG)
+        {
+
+            ESP_LOGI(TAG, "speed_one_point:%d press:%d speed_offset:%d\n", speed_one_point, (int)(press * 100), speed_offset);
         }
-        
-        // 
+
+        //
         //自适应算法 结合心跳包上传
-        if (press > 0)
-        {
-            /* code */
-            speed_one_point = (0.83 * sqrt(2 * (press * 100) / 1.293) - 0.2) * 100; //press*100;//计算风速(0.83*Math.sqrt(2*(stress)/1.293)-0.2).toFixed(2);
-        }
-        else
-        {
-            speed_one_point = -(0.83 * sqrt(2 * (-press * 100) / 1.293) - 0.2) * 100; //press*100;//计算风速(0.83*Math.sqrt(2*(stress)/1.293)-0.2).toFixed(2);
-        }
-        speed_one_point -= speed_offset;
+
+        speed_one_point = get_speed(press);
+
+        
         temperature_one_point = temperature * 100;
         count_filter = 0;
         ams5915_p[count_point] = press * 100;
@@ -184,11 +209,12 @@ void I2C_AMS5915_Read_Task(void *pvParameters)
     data[11] = 0x00;
     ESP_LOGI(TAG, "i2c_example_master_init:%d\n", i2c_example_master_init());
     short cnt = 0;
+    spi_flash_read(ADDR_OFFSET * 4096, (uint32_t *)&speed_offset, sizeof(speed_offset));
     while (1)
     {
         I2C_AMS5915_Read();
         short temp_t_i = (short)(temperature * 100);
-        short press_i = (short)(press * 10000);
+        short press_i = (short)(press * 10000)-get_stress_offset(speed_offset)*100;
         data[6] = ((temp_t_i & 0xff00) >> 8);
         data[7] = ((temp_t_i & 0x00ff));
         data[8] = ((press_i & 0xff00) >> 8);
@@ -212,11 +238,11 @@ void I2C_AMS5915_Read_Task(void *pvParameters)
         }
 
         hex_str(data, 14, str);
-        if (DEBUG ==0) {
-           uart_write_bytes(UART_NUM_0, (const char *)data, 14);
+        if (DEBUG == 0)
+        {
+            uart_write_bytes(UART_NUM_0, (const char *)data, 14);
         }
-        
-         
+
         // uart_write_bytes(UART_NUM_0, (const char *) str, 28);
         // int len = uart_read_bytes(UART_NUM_0, data, BUF_SIZE, 20 / portTICK_RATE_MS);
         vTaskDelay(100 / portTICK_RATE_MS);
@@ -313,15 +339,14 @@ bool check_update(void)
             if (init_flag == 0)
             {
                 speed_offset += speed_one_point;
+                spi_flash_erase_sector(ADDR_OFFSET);
+                spi_flash_write(ADDR_OFFSET * 4096, (uint32_t *)&speed_offset, sizeof(speed_offset));
             }
             else
             {
                 init_flag = 0;
             }
-
-            /* code */
         }
-
         time(&time_start);
         return true;
     }
