@@ -433,10 +433,3 @@ CONFIG_ENABLE_UNIFIED_PROVISIONING=
 # wpa_supplicant
 #
 CONFIG_LTM_FAST=y
-config FIRMWARE_UPGRADE_URL
-    string "firmware upgrade url endpoint"
-    default "https://192.168.0.107:8070/hello-world.bin"
-    help
-        URL of server which hosts the firmware
-        image.
-endmenu

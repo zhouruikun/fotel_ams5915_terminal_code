@@ -39,7 +39,7 @@
 #define I2C_EXAMPLE_MASTER_RX_BUF_DISABLE 0 /*!< I2C master do not need buffer */
 
 #define AMS5915
-#define DEBUG 0
+#define DEBUG 1
 #define I2C_AMS5915_ADD 0x28
 #define LAST_NACK_VAL 0x2 /*!< I2C last_nack value */
 #define ACK_CHECK_EN 0x1  /*!< I2C master will check ack from slave*/
@@ -66,6 +66,10 @@ double temperature = 0;
 static const char *TAG = "asm";
 static double last_temp = 0;
 static double last_ams = 0;
+uint8_t update_flag = false;
+  extern  uint8_t time_geted;
+  extern uint8_t http_run;
+bool run_update(void);
 static esp_err_t i2c_example_master_init()
 {
     int i2c_master_port = I2C_EXAMPLE_MASTER_NUM;
@@ -215,7 +219,7 @@ void I2C_AMS5915_Read_Task(void *pvParameters)
     data[10] = 0;
     data[11] = 0x00;
     ESP_LOGI(TAG, "i2c_example_master_init:%d\n", i2c_example_master_init());
-    short cnt = 0;
+    short cnt = 0;short cnt_check_update = 0;
     spi_flash_read(ADDR_OFFSET * 4096, (uint32_t *)&speed_offset, sizeof(speed_offset));
     while (1)
     {
@@ -252,6 +256,19 @@ void I2C_AMS5915_Read_Task(void *pvParameters)
         // uart_write_bytes(UART_NUM_0, (const char *) str, 28);
         // int len = uart_read_bytes(UART_NUM_0, data, BUF_SIZE, 20 / portTICK_RATE_MS);
         vTaskDelay(100 / portTICK_RATE_MS);
+        update_flag = run_update();
+        if (http_run==0)//模拟运行上传
+        {
+            cnt_check_update++;
+            if (cnt_check_update>10)
+            {
+                ESP_LOGI(TAG, "cnt_check_update\n");
+                /* code */
+                check_update();
+            }
+            
+        }
+        
     }
 }
 
@@ -274,8 +291,7 @@ char *generate_str(void)
     time(&now_time);
     root = cJSON_CreateObject();
     item = cJSON_CreateObject();
-    last_temp = ams5915_t[count_point - 1];
-    last_ams = ams5915_p[count_point - 1];
+
 
     data_array_press = cJSON_CreateDoubleArray(ams5915_p, count_point);
     data_array_temp = cJSON_CreateDoubleArray(ams5915_t, count_point);
@@ -305,8 +321,8 @@ char *generate_strforpoint(void)
     time(&now_time);
     root = cJSON_CreateObject();
     item = cJSON_CreateObject();
-    last_temp = ams5915_t[count_point - 1];
-    last_ams = ams5915_p[count_point - 1];
+    // last_temp = ams5915_t[count_point - 1];
+    // last_ams = ams5915_p[count_point - 1];
 
     data_array_press = cJSON_CreateDoubleArray(ams5915_p, count_point);
     data_array_temp = cJSON_CreateDoubleArray(ams5915_t, count_point);
@@ -330,7 +346,8 @@ char *generate_strforpoint(void)
 #define GAP_TEMP 20
 #define GAP_AMS 2
 #define HEART_PACK 2
-bool check_update(void)
+  extern  uint8_t time_geted;
+bool run_update(void)
 {
     //定时判断是否需要上传数据 标准为本次数据与上次上传数据差值是否大于范围 外加定时2分钟一个心跳包
     static time_t time_start = 0;
@@ -338,10 +355,17 @@ bool check_update(void)
     time_t now_time_end = 0;
     char *str_request;
     time(&now_time_end);
-    if (abs(last_temp - temperature * 100) > GAP_TEMP || abs(last_ams - press * 100) > GAP_AMS || (now_time_end - time_start) > 60 * HEART_PACK)
+    if ( time_geted==1&&now_time_end<=1448812800)
     {
+        esp_restart();
+        /* code */
+    }
+    if (abs(last_temp - temperature * 100) > GAP_TEMP || abs(last_ams - press * 100) > GAP_AMS || (now_time_end - time_start) > 60 * HEART_PACK)
+    {    
+        ESP_LOGI(TAG, "time_start:%ld    %d    %d\n", now_time_end-time_start,(int)(last_temp - temperature * 100),(int)(last_ams - press * 100));
         if ((now_time_end - time_start) > 60 * HEART_PACK)
         { //扣除零点
+       
             if (init_flag == 0)
             {
                 speed_offset =  (int)(press * 1000);//speed_one_point;
@@ -354,6 +378,7 @@ bool check_update(void)
             }
         }
         time(&time_start);
+
         return true;
     }
     else
@@ -361,4 +386,22 @@ bool check_update(void)
         count_point = 0;
         return false;
     }
+}
+
+bool check_update(void)
+{
+    if(update_flag)
+    {
+        update_flag=false; 
+        last_temp = ams5915_t[count_point - 1];
+        last_ams = ams5915_p[count_point - 1];
+        ESP_LOGI(TAG, "last_temp:%d  last_ams  %d    \n", (int)last_temp*1000,(int)last_ams*1000);
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+    
+ 
 }

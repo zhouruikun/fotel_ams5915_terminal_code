@@ -24,7 +24,7 @@ static const char *REQUEST = "GET " WEB_URL " HTTP/1.0\r\n"
     "\r\n\r\n" ;
 char * Header[100] = {0};
 char str_asm[80];
- 
+ uint8_t http_run=0;
  
 void ICACHE_FLASH_ATTR  http_get_task(void *pvParameters)
 {
@@ -41,9 +41,10 @@ void ICACHE_FLASH_ATTR  http_get_task(void *pvParameters)
         /* Wait for the callback to set the CONNECTED_BIT in the
            event group.
         */
-        stopLed(LED_RED);
+        stopLed(LED_RED);http_run=0;
         xEventGroupWaitBits(wifi_event_group, CONNECTING_BIT,
                             false, false, portMAX_DELAY);
+                            http_run=1;
         str_request = generate_strforpoint();
         if(str_request==NULL)//数据无变化 无需上传
         {

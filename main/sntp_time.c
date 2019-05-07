@@ -39,7 +39,7 @@ time_t now;
 
 static void obtain_time(void);
 static void initialize_sntp(void);
- 
+ uint8_t time_geted=0;
 void Init_time(void)
 {
  
@@ -101,6 +101,17 @@ static void obtain_time(void)
         time(&now);
         localtime_r(&now, &timeinfo);
     }
+    if (retry>=20)
+    {
+        esp_restart();
+        /* code */
+    }
+    else
+    {
+        time_geted=1;
+    }
+    
+    
 
 }
 
