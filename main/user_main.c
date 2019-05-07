@@ -50,7 +50,7 @@ uint8_t sta_mac[8] = {0};
 static const char *TAG = "idle";
  uint8_t sta_mac_str[18] = {0};
  void hex_str(unsigned char *inchar, unsigned int len, unsigned char *outtxt);
- 
+ void simple_ota_task(void * pvParameter);
 
 #define GPIO_OUTPUT_IO_0    12
 #define GPIO_OUTPUT_IO_1    14
@@ -61,6 +61,18 @@ static const char *TAG = "idle";
 void app_main()
 {
     esp_read_mac(sta_mac, ESP_MAC_WIFI_STA);
+
+        // Initialize NVS.
+    esp_err_t err = nvs_flash_init();
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES) {
+        // OTA app partition table has a smaller NVS partition size than the non-OTA
+        // partition table. This size mismatch may cause NVS initialization to fail.
+        // If this happens, we erase NVS partition and initialize NVS again.
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        err = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK( err );
+
     hex_str(sta_mac, 6, sta_mac_str);
 
     gpio_config_t io_conf;
@@ -76,22 +88,17 @@ void app_main()
     io_conf.pull_up_en = 0;
     //configure GPIO with the given settings
     gpio_config(&io_conf);
- 
-
     register_led(LED_BLUE ,GPIO_OUTPUT_IO_1,0);//led指示灯
     register_led(LED_RED ,GPIO_OUTPUT_IO_0,0);//led指示灯
- 
     xTaskCreate(led_task, "led_task", 1024, NULL, 2, NULL);
-    xTaskCreate(button_task, "button_task", 2048, NULL, 2, NULL);
-    xTaskCreate(I2C_AMS5915_Read_Task, "I2C_AMS5915_Read_Task", 2048, NULL, 2, NULL);
-    xTaskCreate(&http_get_task, "http_get_task", 16384, NULL, 5, NULL);
-
+    
+    xTaskCreate(simple_ota_task, "ota_example_task", 8192, NULL, 5, NULL);//开机进行升级  
     Init_time();
- while(1){
-          //  ESP_LOGI(TAG,"free heap = %d\r\n", esp_get_free_heap_size());
-           vTaskDelay(1000/portTICK_RATE_MS);   
-    /* code */
- }
+    while(1){
+              //  ESP_LOGI(TAG,"free heap = %d\r\n", esp_get_free_heap_size());
+              vTaskDelay(1000/portTICK_RATE_MS);   
+        /* code */
+    }
 }
 
  

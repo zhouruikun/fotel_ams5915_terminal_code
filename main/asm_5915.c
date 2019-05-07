@@ -118,14 +118,15 @@ extern char str_asm[80];
 
 int get_speed(double stress)
 {
+    stress -= (speed_offset/1000.0);
     if (stress > 0)
     {
         /* code */
-        return (0.83 * sqrt(2 * (press * 100) / 1.293) - 0.2) * 100-speed_offset; //press*100;//计算风速(0.83*Math.sqrt(2*(stress)/1.293)-0.2).toFixed(2);
+        return (0.83 * sqrt(2 * ((stress)* 100) / 1.293) - 0.2) * 100-0; //press*100;//计算风速(0.83*Math.sqrt(2*(stress)/1.293)-0.2).toFixed(2);
     }
     else
     {
-        return -(0.83 * sqrt(2 * (-press * 100) / 1.293) - 0.2) * 100 - speed_offset; //press*100;//计算风速(0.83*Math.sqrt(2*(stress)/1.293)-0.2).toFixed(2);
+        return -(0.83 * sqrt(2 * (-(stress) * 100) / 1.293) - 0.2) * 100 - 0; //press*100;//计算风速(0.83*Math.sqrt(2*(stress)/1.293)-0.2).toFixed(2);
     }
 }
 double get_stress_offset(int speed_offset)
@@ -148,21 +149,27 @@ double I2C_AMS5915_Read(void)
     static double temperature_last = 0;
     static double press_last = 0;
     I2C_Readbuff(I2C_AMS5915_ADD, databuf);
+
+    //温度数据转换
     temperature = (databuf[2] << 3) | (databuf[3] >> 5);
     temperature = (temperature * 200.0) / 2048 - 50;
+    //滤波
     temperature = temperature * 0.1 + temperature_last * 0.9;
     temperature_last = temperature;
+    //其他数据转换
     press = ((databuf[0] & 0x3f) << 8) | databuf[1];
     press = ((press - 1638) / ((14745 - 1638) / 5)); //*0.04+ams5915_p*0.96;
+    //滤波
     press = press * 0.1 + press_last * 0.9;
     press_last = press;
+    
     count_filter++;
     if (count_filter > 10)
     {
         if (DEBUG)
         {
 
-            ESP_LOGI(TAG, "speed_one_point:%d press:%d speed_offset:%d\n", speed_one_point, (int)(press * 100), speed_offset);
+            ESP_LOGI(TAG, "speed_one_point:%d press:%d speed_offset:%d\n", speed_one_point, (int)(press * 1000), speed_offset);
         }
 
         //
@@ -214,11 +221,10 @@ void I2C_AMS5915_Read_Task(void *pvParameters)
     {
         I2C_AMS5915_Read();
         short temp_t_i = (short)(temperature * 100);
-        short press_i = (short)(press * 10000)-get_stress_offset(speed_offset)*100;
+        short press_i = (short)(press * 1000)-speed_offset;
         data[6] = ((temp_t_i & 0xff00) >> 8);
         data[7] = ((temp_t_i & 0x00ff));
-        data[8] = ((press_i & 0xff00) >> 8);
-        data[9] = ((press_i & 0x00ff));
+        data[8] = ((press_i & 0xff00) >> 8);        data[9] = ((press_i & 0x00ff));
         cnt++;
         if (cnt > 5)
         {
@@ -338,7 +344,7 @@ bool check_update(void)
         { //扣除零点
             if (init_flag == 0)
             {
-                speed_offset += speed_one_point;
+                speed_offset =  (int)(press * 1000);//speed_one_point;
                 spi_flash_erase_sector(ADDR_OFFSET);
                 spi_flash_write(ADDR_OFFSET * 4096, (uint32_t *)&speed_offset, sizeof(speed_offset));
             }

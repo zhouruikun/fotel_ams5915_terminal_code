@@ -37,7 +37,6 @@ void ICACHE_FLASH_ATTR  http_get_task(void *pvParameters)
     int s, r;
     char recv_buf[64];
     char * str_request;
-    initialise_wifi();
     while(1) {
         /* Wait for the callback to set the CONNECTED_BIT in the
            event group.
