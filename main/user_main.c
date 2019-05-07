@@ -88,11 +88,14 @@ void app_main()
     io_conf.pull_up_en = 0;
     //configure GPIO with the given settings
     gpio_config(&io_conf);
+    initialise_wifi();
     register_led(LED_BLUE ,GPIO_OUTPUT_IO_1,0);//led指示灯
     register_led(LED_RED ,GPIO_OUTPUT_IO_0,0);//led指示灯
     xTaskCreate(led_task, "led_task", 1024, NULL, 2, NULL);
-    
-    xTaskCreate(simple_ota_task, "ota_example_task", 8192, NULL, 5, NULL);//开机进行升级  
+        xTaskCreate(button_task, "button_task", 2048, NULL, 2, NULL);
+    xTaskCreate(I2C_AMS5915_Read_Task, "I2C_AMS5915_Read_Task", 2048, NULL, 2, NULL);
+    xTaskCreate(&http_get_task, "http_get_task", 16384, NULL, 5, NULL);
+    // xTaskCreate(simple_ota_task, "ota_example_task", 8192, NULL, 5, NULL);//开机进行升级  
     Init_time();
     while(1){
               //  ESP_LOGI(TAG,"free heap = %d\r\n", esp_get_free_heap_size());
