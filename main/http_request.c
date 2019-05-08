@@ -25,7 +25,7 @@ static const char *REQUEST = "GET " WEB_URL " HTTP/1.0\r\n"
 char * Header[100] = {0};
 char str_asm[80];
  uint8_t http_run=0;
- 
+ void set_back(void);
 void ICACHE_FLASH_ATTR  http_get_task(void *pvParameters)
 {
     const struct addrinfo hints = {
@@ -45,6 +45,7 @@ void ICACHE_FLASH_ATTR  http_get_task(void *pvParameters)
         xEventGroupWaitBits(wifi_event_group, CONNECTING_BIT,
                             false, false, portMAX_DELAY);
                             http_run=1;
+        set_back();
         str_request = generate_strforpoint();
         if(str_request==NULL)//数据无变化 无需上传
         {
@@ -120,7 +121,7 @@ void ICACHE_FLASH_ATTR  http_get_task(void *pvParameters)
             bzero(recv_buf, sizeof(recv_buf));
             r = read(s, recv_buf, sizeof(recv_buf)-1);
             for(int i = 0; i < r; i++) {
-                putchar(recv_buf[i]);
+                // putchar(recv_buf[i]);
             }
         } while(r > 0);
         if (r>=0 ) {
@@ -130,12 +131,13 @@ void ICACHE_FLASH_ATTR  http_get_task(void *pvParameters)
         close(s);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
         while(1)
-        {
+        { 
+             vTaskDelay(100 / portTICK_PERIOD_MS);
             if(check_update())
             {
                 break;
             }
-            vTaskDelay(100 / portTICK_PERIOD_MS);
+          
         }
     }
 }

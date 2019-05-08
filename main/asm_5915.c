@@ -39,7 +39,7 @@
 #define I2C_EXAMPLE_MASTER_RX_BUF_DISABLE 0 /*!< I2C master do not need buffer */
 
 #define AMS5915
-#define DEBUG 1
+#define DEBUG 0
 #define I2C_AMS5915_ADD 0x28
 #define LAST_NACK_VAL 0x2 /*!< I2C last_nack value */
 #define ACK_CHECK_EN 0x1  /*!< I2C master will check ack from slave*/
@@ -51,7 +51,9 @@
  * @brief i2c master initialization
  */
 unsigned char databuf[4] = {0};
-double press = 0;
+double press = 0; 
+        short temp_t_i =0;
+        short press_i = 0;
 double ams5915_p[MAX_POINT];
 double ams5915_t[MAX_POINT];
 int speed_one_point;
@@ -70,6 +72,7 @@ uint8_t update_flag = false;
   extern  uint8_t time_geted;
   extern uint8_t http_run;
 bool run_update(void);
+void set_back(void);
 static esp_err_t i2c_example_master_init()
 {
     int i2c_master_port = I2C_EXAMPLE_MASTER_NUM;
@@ -122,7 +125,7 @@ extern char str_asm[80];
 
 int get_speed(double stress)
 {
-    stress -= (speed_offset/1000.0);
+
     if (stress > 0)
     {
         /* code */
@@ -168,29 +171,29 @@ double I2C_AMS5915_Read(void)
     press_last = press;
     
     count_filter++;
-    if (count_filter > 10)
+    ams5915_p[0] += (press * 1000);
+    ams5915_t[0] += (temperature * 100);
+    if (count_filter >= 4)
     {
-        if (DEBUG)
-        {
-
-            ESP_LOGI(TAG, "speed_one_point:%d press:%d speed_offset:%d\n", speed_one_point, (int)(press * 1000), speed_offset);
-        }
-
         //
         //自适应算法 结合心跳包上传
-
-        speed_one_point = get_speed(press);
-
-        
-        temperature_one_point = temperature * 100;
         count_filter = 0;
-        ams5915_p[count_point] = press * 100;
-        ams5915_t[count_point] = temperature * 100;
+        temp_t_i =  (short)((ams5915_t[0]/4));
+        press_i = (short)((ams5915_p[0]/4))-speed_offset;
+        speed_one_point = get_speed(((ams5915_p[0]/4)-speed_offset)/1000.0);
+        temperature_one_point = temp_t_i;
+         if (DEBUG)
+        {
+
+            ESP_LOGI(TAG, "speed_one_point:%d press_i:%d temp_t_i:%d speed_offset:%d\n", speed_one_point, press_i, temp_t_i,speed_offset);
+        }
+        ams5915_p[0] = 0;
+        ams5915_t[0] = 0;
         count_point++;
         if (count_point >= MAX_POINT)
             count_point = 0;
     }
-    return ams5915_p[count_point];
+    return ams5915_p[0];
 }
 
 #define BUF_SIZE 256
@@ -224,8 +227,7 @@ void I2C_AMS5915_Read_Task(void *pvParameters)
     while (1)
     {
         I2C_AMS5915_Read();
-        short temp_t_i = (short)(temperature * 100);
-        short press_i = (short)(press * 1000)-speed_offset;
+
         data[6] = ((temp_t_i & 0xff00) >> 8);
         data[7] = ((temp_t_i & 0x00ff));
         data[8] = ((press_i & 0xff00) >> 8);        data[9] = ((press_i & 0x00ff));
@@ -262,9 +264,10 @@ void I2C_AMS5915_Read_Task(void *pvParameters)
             cnt_check_update++;
             if (cnt_check_update>10)
             {
-                ESP_LOGI(TAG, "cnt_check_update\n");
+ 
                 /* code */
                 check_update();
+                 set_back();
             }
             
         }
@@ -344,7 +347,7 @@ char *generate_strforpoint(void)
     return str_request;
 }
 #define GAP_TEMP 20
-#define GAP_AMS 2
+#define GAP_AMS 30
 #define HEART_PACK 2
   extern  uint8_t time_geted;
 bool run_update(void)
@@ -360,9 +363,9 @@ bool run_update(void)
         esp_restart();
         /* code */
     }
-    if (abs(last_temp - temperature * 100) > GAP_TEMP || abs(last_ams - press * 100) > GAP_AMS || (now_time_end - time_start) > 60 * HEART_PACK)
+    if (abs(last_temp - temp_t_i ) > GAP_TEMP || abs(last_ams - speed_one_point ) > GAP_AMS || (now_time_end - time_start) > 60 * HEART_PACK)
     {    
-        ESP_LOGI(TAG, "time_start:%ld    %d    %d\n", now_time_end-time_start,(int)(last_temp - temperature * 100),(int)(last_ams - press * 100));
+        ESP_LOGI(TAG, "time_start:%ld    %d    %d\n", now_time_end-time_start,(int)(last_temp - temp_t_i),(int)(last_ams - speed_one_point));
         if ((now_time_end - time_start) > 60 * HEART_PACK)
         { //扣除零点
        
@@ -378,7 +381,11 @@ bool run_update(void)
             }
         }
         time(&time_start);
-
+        if (update_flag==false)
+        {
+                last_temp = temperature_one_point;
+                last_ams = speed_one_point;
+        }
         return true;
     }
     else
@@ -388,14 +395,16 @@ bool run_update(void)
     }
 }
 
+void set_back()
+{
+ 
+}
 bool check_update(void)
 {
     if(update_flag)
     {
         update_flag=false; 
-        last_temp = ams5915_t[count_point - 1];
-        last_ams = ams5915_p[count_point - 1];
-        ESP_LOGI(TAG, "last_temp:%d  last_ams  %d    \n", (int)last_temp*1000,(int)last_ams*1000);
+       
         return true;
     }
     else
